@@ -1,0 +1,13 @@
+{
+	"meanConfidenceIntervalWithKnownVariance": true,
+	"meanConfidenceIntervalWithUnknownVariance": false,
+	"varianceConfidenceInterval": false,
+	"confidence": 0.95,
+	"statistics": {
+		"mean": 110
+	},
+	"params": {
+		"sampleSize": 150,
+		"variance": 100
+	}
+}
