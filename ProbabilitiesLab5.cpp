@@ -5,6 +5,7 @@
 
 #include <boost/math/distributions/normal.hpp>
 #include <boost/math/distributions/students_t.hpp>
+#include <boost/math/distributions/chi_squared.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -35,39 +36,12 @@ template<std::floating_point T, std::ranges::sized_range Range>
 T biasedSampleVariance(Range values) {
 	T mean = sampleMean<T>(values);
 	return sampleMean<T>(values |
-		std::views::transform([mean](std::pair<T, T> value) { return std::pair<T, T>(std::pow(value.first - mean, 2), value.second); })
+		std::views::transform([mean](std::pair<T, T> value) {
+			return std::pair<T, T>(std::pow(value.first - mean, 2), value.second); 
+		})
 	);
 }
 
-
-template<std::floating_point T, std::ranges::sized_range Range>
-	requires std::is_convertible_v<std::ranges::range_value_t<Range>, std::pair<T, T>>
-T unbiasedSampleVariance(Range values) {
-	T size = sampleSize<T>(values);
-	return biasedSampleVariance<T>(values) * size / (size - 1);
-}
-
-
-template<std::floating_point T, std::ranges::sized_range Range>
-	requires std::is_convertible_v<std::ranges::range_value_t<Range>, std::pair<T, T>>
-T biasedSampleStandardDeviation(Range values) {
-	return std::sqrt(biasedSampleVariance<T>(values));
-}
-
-
-template<std::floating_point T, std::ranges::sized_range Range>
-	requires std::is_convertible_v<std::ranges::range_value_t<Range>, std::pair<T, T>>
-T unbiasedSampleStandardDeviation(Range values) {
-	return std::sqrt(unbiasedSampleVariance<T>(values));
-}
-
-
-//template<std::floating_point T>
-//T studentsCoefficient(T sampleSize, T confidence) {
-//	return boost::math::quantile(
-//		boost::math::complement(boost::math::students_t_distribution<T>(sampleSize - 1), (1 - confidence) / 2)
-//	);
-//}
 
 using nlohmann::json;
 
@@ -101,17 +75,26 @@ using FloatType = double;
 std::pair<FloatType, FloatType> meanConfidenceIntervalWithKnownVariance(
 	FloatType sampleSize, FloatType statMean, FloatType variance, FloatType confidence
 ) {
-	auto quantile = boost::math::quantile(boost::math::normal(), (confidence + 1) / 2);;
+	auto quantile = boost::math::quantile(boost::math::normal(), (confidence + 1) / 2);
 	auto epsilon = std::sqrt(variance / sampleSize) * quantile;
 	return { statMean - epsilon, statMean + epsilon };
 }
 
 std::pair<FloatType, FloatType> meanConfidenceIntervalWithUnknownVariance(
-	FloatType sampleSize, FloatType statMean, FloatType statVariance, FloatType confidence
+	FloatType sampleSize, FloatType statMean, FloatType statUnbiasedVariance, FloatType confidence
 ) {
-	auto quantile = boost::math::quantile(boost::math::students_t(sampleSize - 1), (confidence + 1) / 2);;
-	auto epsilon = std::sqrt(statVariance / sampleSize) * quantile;
+	auto quantile = boost::math::quantile(boost::math::students_t(sampleSize - 1), (confidence + 1) / 2);
+	auto epsilon = std::sqrt(statUnbiasedVariance / sampleSize) * quantile;
 	return { statMean - epsilon, statMean + epsilon };
+}
+
+
+std::pair<FloatType, FloatType> varianceConfidenceInterval(
+	FloatType sampleSize, FloatType statUnbiasedVariance, FloatType confidence
+) {
+	auto chi1 = boost::math::quantile(boost::math::chi_squared(sampleSize - 1), (1 + confidence) / 2);
+	auto chi2 = boost::math::quantile(boost::math::chi_squared(sampleSize - 1), (1 - confidence) / 2);
+	return { statUnbiasedVariance * (sampleSize - 1) / chi1, statUnbiasedVariance * (sampleSize - 1) / chi2 };
 }
 
 
@@ -139,11 +122,10 @@ const std::vector<std::pair<std::string, std::string>> statisticsNames{
 
 
 void calculateStatistics(json& sample, const auto& varSeries) {
+	auto size = sample["params"]["sampleSize"];
+
 	sample["statistics"]["mean"] = sampleMean<FloatType>(varSeries);
 	sample["statistics"]["biasedVariance"] = biasedSampleVariance<FloatType>(varSeries);
-	sample["statistics"]["unbiasedVariance"] = unbiasedSampleVariance<FloatType>(varSeries);
-	sample["statistics"]["biasedStandardDeviation"] = biasedSampleStandardDeviation<FloatType>(varSeries);
-	sample["statistics"]["unbiasedStandardDeviation"] = unbiasedSampleStandardDeviation<FloatType>(varSeries);
 
 	sample["params"]["sampleSize"] = sampleSize<FloatType>(varSeries);
 }
@@ -158,6 +140,18 @@ void calculateStatistics(json& sample) {
 			[](auto keyValue) -> std::pair<FloatType, FloatType> { return { std::stod(keyValue.first), keyValue.second}; }
 		);
 		calculateStatistics(sample, varSeries);
+	}
+
+	FloatType sampleSize = sample["params"]["sampleSize"];
+	if (sample["statistics"].contains("biasedVariance")) {
+		sample["statistics"]["unbiasedVariance"] = sample["statistics"]["biasedVariance"].get<FloatType>() * sampleSize / (sampleSize - 1);
+	} else if (sample["statistics"].contains("unbiasedVariance")) {
+		sample["statistics"]["biasedVariance"] = sample["statistics"]["unbiasedVariance"].get<FloatType>() * (sampleSize - 1) / sampleSize;
+	}
+
+	if (sample["statistics"].contains("biasedVariance")) {
+		sample["statistics"]["biasedStandardDeviation"] = std::sqrt(sample["statistics"]["biasedVariance"].get<FloatType>());
+		sample["statistics"]["unbiasedStandardDeviation"] = std::sqrt(sample["statistics"]["unbiasedVariance"].get<FloatType>());
 	}
 }
 
@@ -203,15 +197,23 @@ int main()
 	if (sample["meanConfidenceIntervalWithUnknownVariance"].get<bool>()) {
 		FloatType sampleSize = sample["params"]["sampleSize"];
 		FloatType statMean = sample["statistics"]["mean"];
-		FloatType statBiasedVariance = sample["statistics"]["biasedVariance"];
+		FloatType statUnbiasedVariance = sample["statistics"]["unbiasedVariance"];
 		FloatType confidence = sample["confidence"];
 
-		auto interval = meanConfidenceIntervalWithKnownVariance(sampleSize, statMean, statBiasedVariance, confidence);
+		auto interval = meanConfidenceIntervalWithUnknownVariance(sampleSize, statMean, statUnbiasedVariance, confidence);
 		std::cout << std::format("Mean confidence interval (with unknown variance): ({:.8f}, {:.8f}), confidence = {:.2f}",
 			interval.first, interval.second, confidence);
 	}
 
+	if (sample["varianceConfidenceInterval"].get<bool>()) {
+		FloatType sampleSize = sample["params"]["sampleSize"];
+		FloatType statUnbiasedVariance = sample["statistics"]["unbiasedVariance"];
+		FloatType confidence = sample["confidence"];
 
+		auto interval = varianceConfidenceInterval(sampleSize, statUnbiasedVariance, confidence);
+		std::cout << std::format("Variance condifence interval: ({:.8f}, {:.8f}), confidence = {:.2f}",
+			interval.first, interval.second, confidence);
+	}
 
 	return 0;
 }

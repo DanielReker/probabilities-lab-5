@@ -1,6 +1,7 @@
 {
-	"meanConfidenceIntervalWithKnownVariance": true,
+	"meanConfidenceIntervalWithKnownVariance": false,
 	"meanConfidenceIntervalWithUnknownVariance": true,
 	"varianceConfidenceInterval": true,
+	"confidence": 0.995,
 	"values": [ 1, 2, 3, 4, 5 ]
 }
