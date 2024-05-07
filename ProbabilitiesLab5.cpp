@@ -190,7 +190,7 @@ int main()
 		FloatType confidence = sample["confidence"];
 
 		auto interval = meanConfidenceIntervalWithKnownVariance(sampleSize, statMean, variance, confidence);
-		std::cout << std::format("Mean confidence interval (with known variance): ({:.8f}, {:.8f}), confidence = {:.2f}",
+		std::cout << std::format("Mean confidence interval (with known variance): ({:.8f}, {:.8f}), confidence = {:.2f}\n",
 			interval.first, interval.second, confidence);
 	}
 
@@ -201,7 +201,7 @@ int main()
 		FloatType confidence = sample["confidence"];
 
 		auto interval = meanConfidenceIntervalWithUnknownVariance(sampleSize, statMean, statUnbiasedVariance, confidence);
-		std::cout << std::format("Mean confidence interval (with unknown variance): ({:.8f}, {:.8f}), confidence = {:.2f}",
+		std::cout << std::format("Mean confidence interval (with unknown variance): ({:.8f}, {:.8f}), confidence = {:.2f}\n",
 			interval.first, interval.second, confidence);
 	}
 
@@ -211,7 +211,7 @@ int main()
 		FloatType confidence = sample["confidence"];
 
 		auto interval = varianceConfidenceInterval(sampleSize, statUnbiasedVariance, confidence);
-		std::cout << std::format("Variance condifence interval: ({:.8f}, {:.8f}), confidence = {:.2f}",
+		std::cout << std::format("Variance condifence interval: ({:.8f}, {:.8f}), confidence = {:.2f}\n",
 			interval.first, interval.second, confidence);
 	}
 

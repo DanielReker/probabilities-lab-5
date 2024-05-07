@@ -1,0 +1,14 @@
+{
+	"meanConfidenceIntervalWithKnownVariance": false,
+	"meanConfidenceIntervalWithUnknownVariance": false,
+	"varianceConfidenceInterval": false,
+	"variationalSeries": {
+		"0": 107960,
+		"1": 3896493,
+		"2": 24345695,
+		"3": 43291027,
+		"4": 24352129,
+		"5": 3898587,
+		"6": 108109
+	}
+}

@@ -1,0 +1,12 @@
+{
+	"meanConfidenceIntervalWithKnownVariance": false,
+	"meanConfidenceIntervalWithUnknownVariance": false,
+	"varianceConfidenceInterval": false,
+	"variationalSeries": {
+		"1": 3,
+		"2": 24,
+		"3": 48,
+		"4": 24,
+		"6": 1
+	}
+}
